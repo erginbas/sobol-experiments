@@ -34,10 +34,11 @@ def run_noisy_experiment():
     samples_per_estimate = 2000
     seed = 42
 
+    degree_bias = 2.0
     rng_func = np.random.default_rng(seed)
     f, true_indices, coeffs_list = exponential_sparse(
         n, num_top=num_top, num_tail=num_tail, max_degree=max_degree,
-        top_scale=1.0, tail_scale=0.01, rng=rng_func
+        top_scale=1.0, tail_scale=0.01, degree_bias=degree_bias, rng=rng_func
     )
 
     # Summary statistics
@@ -46,9 +47,20 @@ def run_noisy_experiment():
     top_100_energy = sum(c ** 2 for _, c in sorted_coeffs[:100])
     tail_energy = total_energy - top_100_energy
 
+    # Degree distribution of generated coefficients
+    degree_counts = {}
+    for indices, _ in coeffs_list:
+        d = len(indices)
+        degree_counts[d] = degree_counts.get(d, 0) + 1
+
     print(f"\nFunction construction:")
     print(f"  n = {n}")
+    print(f"  degree_bias = {degree_bias}")
     print(f"  Total Fourier coefficients: {len(coeffs_list)}")
+    print(f"  Degree distribution:")
+    for d in sorted(degree_counts):
+        print(f"    degree {d}: {degree_counts[d]} coefficients "
+              f"({100 * degree_counts[d] / len(coeffs_list):.1f}%)")
     print(f"  Total energy (Var(f)): {total_energy:.4f}")
     print(f"  Top-100 coeff energy: {top_100_energy:.4f} "
           f"({100 * top_100_energy / total_energy:.1f}%)")

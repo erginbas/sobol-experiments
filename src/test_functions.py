@@ -195,7 +195,8 @@ def hidden_influential(n, k, order=1, rng=None):
 
 
 def exponential_sparse(n, num_top=100, num_tail=5000, max_degree=4,
-                       top_scale=1.0, tail_scale=0.01, rng=None):
+                       top_scale=1.0, tail_scale=0.01, degree_bias=2.0,
+                       rng=None):
     """Pseudoboolean function with exponentially distributed Fourier coefficients.
 
     Constructs a function f: {0,1}^n -> R as a sum of Walsh characters:
@@ -206,6 +207,7 @@ def exponential_sparse(n, num_top=100, num_tail=5000, max_degree=4,
     - num_tail coefficients have magnitudes ~ Exp(tail_scale), placed at random
       degree-<=max_degree subsets (the "noise floor")
     - All coefficients have random signs
+    - Coefficient degrees are biased toward lower-order terms via degree_bias
 
     Parameters
     ----------
@@ -221,6 +223,11 @@ def exponential_sparse(n, num_top=100, num_tail=5000, max_degree=4,
         Scale parameter for exponential distribution of top coefficients.
     tail_scale : float
         Scale parameter for exponential distribution of tail coefficients.
+    degree_bias : float
+        Controls bias toward lower-order terms. Degree d is chosen with
+        probability proportional to 1/d^degree_bias. Setting degree_bias=0
+        gives uniform degree selection (original behavior). Default 2.0
+        strongly favors lower-order terms.
     rng : np.random.Generator, optional
 
     Returns
@@ -235,13 +242,18 @@ def exponential_sparse(n, num_top=100, num_tail=5000, max_degree=4,
     if rng is None:
         rng = np.random.default_rng()
 
+    # Precompute degree probabilities biased toward lower-order terms
+    degrees = np.arange(1, max_degree + 1)
+    degree_weights = 1.0 / degrees ** degree_bias
+    degree_probs = degree_weights / degree_weights.sum()
+
     def _generate_coeffs(num, scale):
         """Generate Fourier coefficients at random degree-<=max_degree subsets."""
         coeffs = {}  # tuple -> coefficient value
         magnitudes = rng.exponential(scale=scale, size=num)
         signs = rng.choice([-1.0, 1.0], size=num)
         for i in range(num):
-            degree = rng.integers(1, max_degree + 1)  # 1..max_degree
+            degree = rng.choice(degrees, p=degree_probs)
             subset = tuple(sorted(rng.choice(n, size=degree, replace=False)))
             coeffs[subset] = coeffs.get(subset, 0.0) + signs[i] * magnitudes[i]
         return coeffs
